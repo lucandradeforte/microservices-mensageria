@@ -1,0 +1,28 @@
+{
+  "name": "microservices-mensageria",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "libs/node-common",
+    "services/order-service",
+    "services/payment-service"
+  ],
+  "scripts": {
+    "build": "npm run build:node",
+    "build:all": "npm run build:node && npm run build:notification-service",
+    "build:node": "npm run build -w libs/node-common && npm run build -w services/order-service && npm run build -w services/payment-service",
+    "build:node-common": "npm run build -w libs/node-common",
+    "build:notification-service": "dotnet build services/notification-service/NotificationService/NotificationService.csproj",
+    "build:order-service": "npm run build -w services/order-service",
+    "build:payment-service": "npm run build -w services/payment-service",
+    "start:order-service": "npm run start:prod -w services/order-service",
+    "start:payment-service": "npm run start:prod -w services/payment-service"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
+    "typescript": "^6.0.2"
+  }
+}

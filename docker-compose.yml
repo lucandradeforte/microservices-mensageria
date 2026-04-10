@@ -1,0 +1,155 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  order-db:
+    image: postgres:16-alpine
+    container_name: order-db
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - order-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  payment-db:
+    image: postgres:16-alpine
+    container_name: payment-db
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  notification-db:
+    image: postgres:16-alpine
+    container_name: notification-db
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d notification_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    container_name: order-service
+    environment:
+      PORT: 3000
+      SERVICE_NAME: order-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      POSTGRES_HOST: order-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      MAX_RETRIES: 3
+      RETRY_TTL_MS: 5000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      order-db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - backend
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/payment-service/Dockerfile
+    container_name: payment-service
+    environment:
+      PORT: 3001
+      SERVICE_NAME: payment-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      POSTGRES_HOST: payment-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      MAX_RETRIES: 3
+      RETRY_TTL_MS: 5000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      payment-db:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    networks:
+      - backend
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: notification-service
+    environment:
+      SERVICE_NAME: notification-service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      POSTGRES_HOST: notification-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      MAX_RETRIES: 3
+      RETRY_TTL_MS: 5000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      notification-db:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  order-db-data:
+  payment-db-data:
+  notification-db-data:
+
+networks:
+  backend:
+    driver: bridge
